@@ -7,11 +7,41 @@ This document describes our working agreement on all projects. It is authoritati
 - If starting a new project
     - Create a `README.md` if it hasn't been created already. If you have any context as to the purpose and goals of the project, you may add them now. If not, a simple title derived from the folder name will do for now. As we progress through the project, you are free to update this file autonomously, always reporting any changes. Always include a setup section which includes such things as shell scripts to be run, environment variables to be set, dependencies required, and anything else necessary to get the user up and running with a minimum of manual intervention. `README.md` is end-user facing and should not influence operational choices. It is simply a deliverable that must be kept up to date like any other.
     - Create a `project.md` in the `project` folder. This is where project level plans and checklists go, as well as the overall architecture, stack decisions, etc. It is our primary operational document. At this point, its contents will likely mirror the `README.md`.  Further updates to `project.md` **require** human authorization and it should otherwise be considered **write-locked**.
-    - Create a `context.md` in a new `project` folder. The format of your first entry is defined below. The body can be as simple as 'Started [projectname] project. This is our ongoing work log. Entries *must* never be edited after they have been entered. Consider it an auditable artifact.
+    - Create a `context.md` in a new `project` folder. The format of your first entry is defined below. The body can be as simple as 'Started [projectname] project.' This is our ongoing work log. Entries *must* never be edited after they have been entered. Consider it an auditable artifact.
+    - Create context management scripts in `project/scripts/` if they don't exist (add-context, rotate-context). These scripts handle the mechanical parts of context entry creation.
 
 - If resuming an existing project
     - Read `project/project.md`. This will only be updated after discussion and is considered *write-locked* unless given explicit human authorization. This is our primary operational document.
     - Read `project/context.md`. You do not need to read the whole thing. Just the last entry or two, enough to know where we left off in the previous session. Cap at 12K of text at the most. If you do not have enough context from that, ask for help. If no context exists because we are using these standards for the first time on an existing project, create the file if necessary, review the existing codebase, and add an entry that summarizes the current state as well as you can. This is our ongoing work log. Entries *must* never be edited after they have been entered. Consider it an auditable artifact.
+
+## Context Management
+
+Context entries should be added using the provided `project/scripts/add-context` helper:
+
+- **Required parameters:**
+  - `--agent <name>` - Agent name and version (e.g., "OpenCode", "Claude Desktop", "Claude.ai")
+  - `--model <version>` - Model name and version (e.g., "claude-sonnet-4-5", "gpt-4")
+
+- **Body input methods (in priority order):**
+  - Direct argument: `add-context --agent "..." --model "..." "Entry text"`
+  - From file: `add-context --agent "..." --model "..." --file body.txt`
+  - From stdin: `echo "Entry" | add-context --agent "..." --model "..."`
+
+- **Auto-generated fields:**
+  - Date (ISO 8601 with timezone offset)
+  - Hash (Base64-encoded SHA-256 of body text)
+  - Git commit hash (if in repository)
+
+- **Entry guidelines:**
+  - The `EOF` marker at the end is a visual delimiter, not part of the body
+  - The script handles formatting automatically
+  - Never edit `context.md` directly - always append via script
+  - Think: "What would I need to know if session crashed now?"
+
+- **Context rotation:**
+  - Use `project/scripts/rotate-context` when context.md exceeds ~100K
+  - Archives old entries to `context-archive-YYYY-MM-DD.md`
+  - Keeps recent entries in active `context.md`
 
 ## Phases of a feature
 
@@ -54,7 +84,7 @@ This document describes our working agreement on all projects. It is authoritati
         - New dependencies must be justified in commit messages
         - Prefer standard library over third-party
         - Avoid adding dependencies solely for syntactic convenience
-        - For the most part, pinning to a major semver version will be appropriate. Where it isn't, it will be dealt with on a case-by-case basis.
+        - For the most part, pinning to a major semver version will be appropriate. Where it isn't, we will deal with it on a case-by-case basis.
 
 - Testing
     - Use the testing framework decided upon during the planning phase.
@@ -78,40 +108,75 @@ The coding, testing, and linting phases may be commingled as you see fit. In som
 
 ## After **every** interaction
 
-- Security scan
-    - If an interaction resulted in any change to any file, not just code, scan the file(s) for any private information. This could include, but is not limited to, API keys, passwords, usernames, IP addresses, hostnames, SSH keys. Basically anything that is specific to the environment. You may replace these with placeholders and keep the originals in a file called `secrets.env`. This file, if it exists, **must** be in `.gitignore`. If appropriate, include a `secrets.env.example` file and reference this in the `README.md` under a setup section. Consider all projects to be subject to open-sourcing at any time and act accordingly. Report the substitution to me.
+Complete this checklist before marking the interaction done:
 
-        Once again, you are encouraged to develop script(s) for the security scan. Clear exit codes are encouraged (i.e. 0 - Pass, 1 - Fail) and failures should report the issue. 
+1. **Security scan** (if any files changed)
+   - Run security scan on changed files
+   - Replace secrets with placeholders
+   - Update secrets.env and secrets.env.example
+   - Ensure secrets.env is in .gitignore
+   - Report any substitutions
+   - Security scan script encouraged with clear exit codes (0=pass, 1=fail, 2=error)
 
-    - **Always** append your progress to `project/context.md`. This is your message to future you and secondarily to me if I pick up the project six months from now. Think of what you would want to know if the session crashed and you had to resume, which happens more often than you think. We will both thank you in the future. Wherever appropriate, reference the plans and steps defined in `project.md`. The format of an entry is as follows:
+2. **Add context entry** (ALWAYS)
+   - Use `project/scripts/add-context` with agent/model parameters
+   - Summarize: what was done, what changed, what's next
+   - Reference relevant steps in `project.md` where appropriate
+   - Think: "What would I need to know if session crashed now?"
 
+3. **Report progress** (ALWAYS)
+   - Include diffs of changed files
+   - For large diffs (>200 lines), provide summary + representative excerpts
+   - For generated files, note their existence without full content
+   - List any new dependencies or configuration changes
+
+4. **Run tests** (if code changed)
+   - All tests must pass
+   - Report test additions/modifications
+   - Note any skipped tests with reasons
+
+5. **Commit** (recommended after each interaction)
+   - Stage changed files
+   - Write clear commit message (see Commit Messages section)
+   - Do NOT push (only humans can push)
+
+## Commit Messages
+
+Use clear, descriptive commit messages that explain WHAT changed and WHY.
+
+**Format:**
+```
+<component>: <summary>
+
+[Optional detailed explanation]
+[Reference to project.md steps if applicable]
 ```
 
----
-Date: [ISO 8601 local date and time with offset]
-Hash: [Base64 encoded SHA-256 hash of body text]
-Agent: [Agent name and version]
-Model: [Model name and version]
-StartCommit: [Git hash of the most recent commit when starting this interaction]
----
+**Examples:**
+```
+Phase 1: Foundation - Project structure, config, Gmail auth
 
-[body text]
+Classifier: Add retry logic with exponential backoff
+- 3 attempts with 2-10s exponential backoff
+- Handles transient API failures
+- Per project.md Phase 4 requirements
 
-EOF
+Tests: Add corpus-based classification suite
 
+Fixes #42 - Handle edge case in email parsing
 ```
 
-    - In addition to recording your progress in `context.md`, always report your progress to me, complete with diffs of any files changed in the current interaction so that I may follow along. The only exception to this is for very large diffs or generated but not committed files. For very large diffs, summarize changes and include representative excerpts and/or summaries unless full diffs are explicitly requested. For now, the definition of "very large" is left up to the discretion of the model/agent.
-
-## Committing
-
-    - You are free to commit at any time and are encouraged to do it after every interaction, but **never** push without authorization. I will say that again. **Only humans can authorize pushes.** Commit messages are at your discretion but should be human readable and descriptive of the change.
-    - What does not belong in commits:
-        - Generated files
-        - Lockfiles
-        - Editor ephemera (.vscode, .un~, etc.)
-        - Build artifacts
-        - Binaries or vendored code (but make a note of them in the `README.md`).
+**Guidelines:**
+- Keep summary line under 72 characters where practical
+- Use imperative mood ("Add" not "Added")
+- Include context in body for non-obvious changes
+- Reference project.md steps or issue numbers when relevant
+- What does not belong in commits:
+    - Generated files
+    - Lockfiles
+    - Editor ephemera (.vscode, .un~, etc.)
+    - Build artifacts
+    - Binaries or vendored code (but make a note of them in the `README.md`)
 
 ## Feature build/test cycle complete
 
@@ -125,10 +190,52 @@ EOF
 2. If any file changes have occurred since the last test run, run all tests. All tests must pass. If not, report to me.
 3. If any code changes have occurred since the last linter run, run the linter. It must not report any errors or warnings. If it does, report to me.
 4. If a build is required, run it. If any errors or warnings are reported, report them to me, along with any insight or suggestions to fix them.
-5. Commit if necessary and push to origin.
-6. Open a pull request for the change.
+5. Show summary and confirm push:
+   - Display: branch name, files changed, commits to push
+   - Prompt: "Ready to push to origin? (y/n)"
+   - Only proceed if confirmed
+6. Push to origin.
+7. Open a pull request for the change.
+
+## Troubleshooting
+
+**If a context entry was missed:**
+- Create the entry immediately using `add-context`
+- Note in the body: "Retroactive entry for interaction at [approximate time]"
+- Include what was done and current state
+
+**If a DOA step was skipped:**
+- Acknowledge it in the next context entry
+- Complete the missed step if still relevant
+- If a pattern of skipping emerges, discuss process improvement
+
+**If in doubt:**
+- Ask the human before proceeding
+- Better to clarify than to guess wrong
+- Document the clarification for future reference
+
+## Quick Reference
+
+**Starting a new feature:**
+1. Read `project/project.md` for decisions
+2. Read last 1-2 entries in `project/context.md`
+3. Create feature branch: `git checkout -b feature-name`
+4. Implement following DOA phases
+5. Add context after each interaction
+
+**Completing an interaction:**
+1. Run security scan if files changed
+2. Add context: `add-context --agent "..." --model "..." "Summary"`
+3. Report progress with diffs
+4. Commit: `git add . && git commit -m "Component: Summary"`
+
+**Finishing a feature:**
+1. Human declares feature complete
+2. Human says "send 'er"
+3. Run full check sequence
+4. Confirm and push
+5. Open PR
 
 ## Overarching goals
 
-If you haven't figured out yet, these rules are designed to help us work together most efficiently, with the fewest surprises, and the smallest blast radius when things inevitably go wrong. Just remember, if you think you know something I don't, tell me. If you think I know something you don't, ask.
-
+If you haven't figured out yet, these rules are designed to help us work together most efficiently, with the fewest surprises, and the smallest blast radius when things inevitably go wrong. Just remember, if you think you know something I don't, tell me. If you think I know something you don't or you have a question **stop** and ask.

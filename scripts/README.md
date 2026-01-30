@@ -1,6 +1,6 @@
 # Context Management Scripts
 
-Two bash scripts for managing structured context log files with automatic rotation.
+Three bash scripts for managing structured context log files with automatic rotation and efficient reading.
 
 ## Scripts
 
@@ -46,6 +46,53 @@ cat body.txt | add-context --agent "CLI/1.0" --model "gpt-4"
 add-context --agent "CLI/1.0" --model "gpt-4" --session "abc123" \
   --output my-context.md "Context text"
 ```
+
+### `read-context`
+Efficiently reads the last N entries from a context file without loading the entire file into memory.
+
+**Usage:**
+```bash
+read-context [OPTIONS]
+```
+
+**Options:**
+- `-n, --num N` - Number of entries to read (default: `1`)
+- `-f, --file FILE` - Context file to read (default: `context.md`)
+- `-h, --headers-only` - Show only entry headers (date, hash, agent, model)
+- `--help` - Show help message
+
+**Behavior:**
+- Reads entries in chronological order (oldest to newest of the N selected)
+- Uses single-pass AWK parsing for efficiency
+- Memory usage: Only stores the requested N entries
+- Performance: O(n) where n = total entries in file
+
+**Examples:**
+```bash
+# Read last entry (default)
+read-context
+
+# Read last 3 entries
+read-context -n 3
+
+# Show only headers of last entry
+read-context --headers-only
+
+# Show headers of last 5 entries
+read-context -n 5 --headers-only
+
+# Read from different file
+read-context -f project/archived-context.md -n 2
+
+# Quick session start: see where you left off
+read-context -n 2
+```
+
+**Use Cases:**
+- Session resumption: Quickly see recent work without scrolling
+- Debugging: Check what happened in last N interactions
+- Auditing: Review recent context entries
+- Integration: Parse headers programmatically for automation
 
 ### `rotate-context`
 Rotates context files when they exceed a size limit, moving older entries to timestamped overflow files.
@@ -110,22 +157,29 @@ EOF
 - `EOF` marker must be on its own line
 - `session` and `startCommit` fields are optional
 - Body text is hashed for integrity verification
+- **Important:** The `EOF` marker is automatically added by `add-context` - do not include it in your body text
 
 ## Installation
 
 ```bash
-chmod +x add-context rotate-context
+chmod +x add-context read-context rotate-context
 # Optionally move to PATH
-sudo mv add-context rotate-context /usr/local/bin/
+sudo mv add-context read-context rotate-context /usr/local/bin/
 ```
 
 ## Workflow Example
 
 ```bash
+# Start session: see where you left off
+read-context -n 2
+
 # Add entries throughout the day
 add-context --agent "MyApp/1.0" --model "gpt-4" "Morning context"
 add-context --agent "MyApp/1.0" --model "gpt-4" "Afternoon update"
 add-context --agent "MyApp/1.0" --model "gpt-4" "Evening notes"
+
+# Quick check: review recent work
+read-context --headers-only -n 3
 
 # Rotate when needed (manually or via cron)
 rotate-context
@@ -137,6 +191,14 @@ fi
 ```
 
 ## Integration Ideas
+
+**Session start routine:**
+```bash
+# See recent work before starting
+read-context -n 2
+# or just headers for a quick overview
+read-context --headers-only -n 5
+```
 
 **Manual rotation:**
 ```bash
@@ -154,6 +216,15 @@ rotate-context || echo "No rotation needed"
 ```bash
 # Create wrapper script
 add-context "$@" && rotate-context
+```
+
+**Parse recent entries programmatically:**
+```bash
+# Extract dates from last 10 entries
+read-context -n 10 --headers-only | grep "^date:" | cut -d' ' -f2-
+
+# Get agent used in last entry
+read-context --headers-only | grep "^agent:" | cut -d' ' -f2-
 ```
 
 ## Dependencies
@@ -176,6 +247,10 @@ The scripts handle platform differences in `stat` command automatically:
 - `0` - Success
 - `1` - Invalid arguments or missing required parameters
 - `2` - File errors
+
+**read-context:**
+- `0` - Success
+- `1` - Invalid arguments or file not found
 
 **rotate-context:**
 - `0` - Rotation performed (overflow filename printed to stdout)
