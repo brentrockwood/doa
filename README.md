@@ -1,3 +1,6 @@
+> # DEPRECATED: This repository is no longer maintained. Please see [doa-framework](https://github.com/brentrockwood/doa-framework) instead.
+---
+
 # Development Operating Agreement
 
 This document describes our working agreement on all projects. It is authoritative and must only be edited by humans.
